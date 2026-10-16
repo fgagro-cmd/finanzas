@@ -3,7 +3,7 @@
 App para el móvil Android que sustituye a `Control_financiero.xlsx`: situación actual y evolución mensual del dinero (cuentas, bienes, deudas y cobros), con los mismos índices del Excel y el presupuesto de gastos personales. Funciona sin conexión.
 
 - **Dashboard:** capital neto, activos, deuda, liquidez y cobros pendientes; índices con semáforo (ratio liquidez/deuda, endeudamiento, independencia financiera, % stock, balance de situación); gráficas mes a mes y el histórico de cierres con su comentario y objetivo.
-- **Cuentas:** bancos y cajas de efectivo (grupo Personal / Empresa / Ventas) con el saldo que pones tú; el stock de ventas y de tus fincas, que sale solo de sus apps; y los bienes (casa, finca, vehículos, maquinaria como un total).
+- **Cuentas:** bancos y cajas de efectivo (grupo Personal / Empresa / Ventas) con el saldo que pones tú; el stock de ventas y de tus fincas, que sale solo de sus apps; y los bienes (casa, finca, vehículos y cada máquina por separado, con el subtotal de maquinaria).
 - **Deudas y cobros:** préstamos con el capital pendiente, deudas y cobros con pagos parciales, y los cobros pendientes que salen solos de tus apps.
 - **Presupuesto:** nómina objetivo, categorías (fijo, variable, colchón, ahorro), gastos sueltos y vistas de mes y acumulado. Va por libre: no cambia los saldos.
 

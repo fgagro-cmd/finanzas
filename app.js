@@ -4,7 +4,7 @@
    Todo se guarda en el propio móvil (IndexedDB) y funciona sin conexión.
    El código no contiene datos personales: se cargan desde un fichero (Ajustes → Cargar copia). */
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 /* ---------- Utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -554,7 +554,9 @@ function renderCuentas() {
   const i = inputs();
   const ord = { personal: 0, empresa: 1, ventas: 2 };
   const cs = [...state.cuentas].sort((a, b) => ord[a.grupo] - ord[b.grupo] || byName(a, b));
-  const bs = [...state.bienes].sort((a, b) => (b.maquinaria - a.maquinaria) || b.valor - a.valor);
+  const maq = state.bienes.filter((b) => b.maquinaria).sort((a, b) => b.valor - a.valor || byName(a, b));
+  const otros = state.bienes.filter((b) => !b.maquinaria).sort((a, b) => b.valor - a.valor || byName(a, b));
+  const bienRow = (b) => `<li><button class="row" data-id="${b.id}"><div class="main"><div class="name">${esc(b.nombre)}</div><div class="sub">${b.anio ? 'Compra ' + b.anio + (b.compra ? ' · ' + eur0(b.compra) : '') + ' · ' : ''}${b.fecha ? 'valor a ' + fmtDate(b.fecha) : 'valor actual estimado'}</div></div><div class="side"><div class="big">${eur0(b.valor)}</div></div></button></li>`;
   const auto = (k, nombre, v, src) => { const e = estadoFuente(src); return `<li><button class="row auto" data-src="${src}"><div class="main"><div class="name">${nombre}</div><div class="sub">De ${FUENTES[src].nombre} · <span class="tag ${e.cls}">${e.txt}</span></div></div><div class="side"><div class="big">${eur(v)}</div></div></button></li>`; };
   $('#view').innerHTML = `
     <div class="summary"><span>Personal <b>${eur0(i.x.personal)}</b></span><span>Empresa <b>${eur0(i.x.empresa)}</b></span><span>Ventas <b>${eur0(i.x.ventas)}</b></span></div>
@@ -563,7 +565,12 @@ function renderCuentas() {
     <div class="sec"><h3>Stock</h3><span>${eur(i.stock)}</span></div>
     <ul class="list" id="autoList">${auto('sv', 'Stock de ventas', i.x.stockV, 'ventas')}${auto('sf', 'Stock de tus fincas', i.x.stockF, 'stock')}</ul>
     <div class="sec"><h3>Bienes</h3><span>${eur(i.maquinaria + i.otros)}</span></div>
-    ${bs.length ? `<ul class="list" id="bienes">${bs.map((b) => `<li><button class="row" data-id="${b.id}"><div class="main"><div class="name">${esc(b.nombre)} ${b.maquinaria ? '<span class="tag">Maquinaria</span>' : ''}</div><div class="sub">${b.fecha ? 'Valor a ' + fmtDate(b.fecha) : 'Valor actual estimado'}</div></div><div class="side"><div class="big">${eur0(b.valor)}</div></div></button></li>`).join('')}</ul>` : '<p class="empty">Sin bienes</p>'}`;
+    <div id="bienes">
+      <div class="sec" style="margin-top:6px"><h3 style="text-transform:none;letter-spacing:0;font-size:14.5px;color:var(--ink)">Maquinaria · ${maq.length} ${maq.length === 1 ? 'máquina' : 'máquinas'}</h3><span>${eur(i.maquinaria)}</span></div>
+      ${maq.length ? `<ul class="list">${maq.map(bienRow).join('')}</ul>` : '<p class="empty" style="padding:14px">Sin maquinaria</p>'}
+      <div class="sec"><h3 style="text-transform:none;letter-spacing:0;font-size:14.5px;color:var(--ink)">Otros activos</h3><span>${eur(i.otros)}</span></div>
+      ${otros.length ? `<ul class="list">${otros.map(bienRow).join('')}</ul>` : '<p class="empty" style="padding:14px">Sin otros bienes</p>'}
+    </div>`;
   const ct = $('#ctas'); if (ct) ct.onclick = (e) => { const b = e.target.closest('[data-id]'); if (b) openSaldo(b.dataset.id); };
   const bn = $('#bienes'); if (bn) bn.onclick = (e) => { const b = e.target.closest('[data-id]'); if (b) openBien(b.dataset.id); };
   $('#autoList').onclick = (e) => { const b = e.target.closest('[data-src]'); if (b) openFuente(b.dataset.src); };
@@ -619,8 +626,8 @@ function openBien(id) {
   const body = openSheet(isNew ? 'Bien nuevo' : b.nombre, `
     ${field('bV', 'Valor actual estimado €', fmtIn(b.valor))}
     <label class="fld"><span>Nombre</span><input id="bN" type="text" value="${esc(b.nombre)}" autocomplete="off"></label>
-    <button type="button" class="switch" id="bM" role="switch" aria-checked="${maq}"><span>Es la maquinaria (cuenta como «Valor maquinaria»)</span><i></i></button>
-    <p class="hint">La maquinaria va como un único valor total que actualizas tú.</p>
+    <button type="button" class="switch" id="bM" role="switch" aria-checked="${maq}"><span>Es maquinaria (suma en «Valor maquinaria»)</span><i></i></button>
+    <p class="hint">Cada máquina lleva su valor actual, que actualizas tú si se revaloriza o se deprecia. La suma de todas es el «Valor maquinaria» del cierre.</p>
     <div class="actions"><button class="btn primary" id="bSave">Guardar</button></div>
     ${isNew ? '' : '<div class="sep"></div><div class="actions"><button class="btn danger" id="bDel">Borrar</button></div>'}`);
   $('#bM', body).onclick = (e) => { maq = !maq; e.currentTarget.setAttribute('aria-checked', maq); };
@@ -1077,6 +1084,14 @@ async function restoreFromFile(input) {
   const file = input.files[0]; if (!file) return;
   try {
     const j = JSON.parse(await file.text());
+    if (j && j.app === 'finanzas' && j.parcial === 'maquinaria' && Array.isArray(j.bienes)) {
+      // Fichero parcial: sustituye solo la maquinaria, sin tocar el resto de datos
+      const xs = j.bienes.filter((b) => b && b.nombre && isFinite(b.valor));
+      const tot = sum(xs, (b) => b.valor);
+      if (!confirm(`Se sustituirá la maquinaria actual (${eur(inputs().maquinaria)}) por ${xs.length} máquinas (${eur(tot)}). El resto de datos no cambia. ¿Continuar?`)) { input.value = ''; return; }
+      if (commit((c) => { c.bienes = c.bienes.filter((b) => !b.maquinaria).concat(xs.map((b) => ({ id: uid(), nombre: String(b.nombre), valor: r2(b.valor), maquinaria: true, anio: b.anio || null, compra: b.compra != null ? r2(b.compra) : null, fecha: b.fecha || todayISO() }))); })) { closeSheet(); ui.tab = 'cuentas'; renderAll(); toast(`${xs.length} máquinas cargadas · ${eur0(tot)}`); }
+      input.value = ''; return;
+    }
     const s = j && j.state;
     if (!j || j.app !== 'finanzas' || !validState(s)) throw new Error('El fichero no es una copia de Finanzas');
     if (!isEmpty() && !confirm(`Se reemplazarán todos los datos actuales por los del fichero (${stateInfo(s)}). ¿Continuar?`)) { input.value = ''; return; }
