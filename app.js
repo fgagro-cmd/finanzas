@@ -4,7 +4,7 @@
    Todo se guarda en el propio móvil (IndexedDB) y funciona sin conexión.
    El código no contiene datos personales: se cargan desde un fichero (Ajustes → Cargar copia). */
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 /* ---------- Utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -1035,7 +1035,9 @@ function drawSync(box) {
   }
 }
 async function activateSync(url, clave, box) {
-  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/\s]+\/exec\/?$/.test(url)) return toast('La dirección debe ser la de la aplicación web del script y terminar en /exec', true);
+  url = url.replace(/\s+/g, '').replace(/[?#].*$/, '').replace(/\/dev\/?$/, '/exec');
+  if (!/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+|macros)\/s\/[^/\s]+\/exec\/?$/.test(url)) return toast('La dirección debe ser la de «Aplicación web» del script (empieza por https://script.google.com/ y termina en /exec)', true);
+  clave = clave.trim();
   if (!clave) return toast('Escribe la clave', true);
   const prev = { ...sync };
   sync.url = url; sync.clave = clave;
