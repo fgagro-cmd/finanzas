@@ -19,11 +19,11 @@ App para el móvil Android que sustituye a `Control_financiero.xlsx`: situación
 La foto del mes se guarda sola al abrir la app ya en el mes siguiente, con fecha del último día del mes, y queda marcada para revisar y añadir el comentario. También se puede cerrar a mano desde el Dashboard, y rehacer o corregir un cierre.
 
 ## Datos de las otras apps
-Ventas, Stock Fincas, AgroServicios y Clientes están publicadas en la misma dirección (`fgagro-cmd.github.io`), así que Finanzas lee sus datos directamente del navegador del móvil, sin conexión y sin escribir nada en ellas:
+Ventas, Stock Fincas, AgroServicios y Asesor están publicadas en la misma dirección (`fgagro-cmd.github.io`), así que Finanzas lee sus datos directamente del navegador del móvil, sin conexión y sin escribir nada en ellas:
 - **Ventas:** valor del stock a precio medio, deudas de clientes (sin tus fincas) y comisiones pendientes (se pueden excluir en Ajustes).
 - **Stock Fincas:** valor del stock de tus fincas.
 - **AgroServicios:** trabajos externos sin cobrar.
-- **Clientes:** meses ya vencidos sin cobrar (se cobra por adelantado, así que el mes en curso cuenta como vencido).
+- **Asesor:** meses ya vencidos sin cobrar de asesoría (se cobra por adelantado, así que el mes en curso cuenta como vencido). Desde la versión 1.1.2 se leen de Asesor (base «asesor»); si Asesor no está instalada o aún no tiene tablas de planes y cobros, se usa la app Clientes como respaldo.
 
 Si se abre Finanzas en otro dispositivo, usa el último dato guardado.
 

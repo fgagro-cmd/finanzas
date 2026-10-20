@@ -121,7 +121,7 @@ function autoCobros(st = state) {
   ];
   if (st.settings.comisiones) xs.push({ k: 'comisiones', nombre: 'Comisiones pendientes', sub: 'De la app de Ventas', v: a.ventas ? a.ventas.com : 0, src: 'ventas' });
   xs.push({ k: 'agro', nombre: 'Trabajos externos', sub: 'AgroServicios · sin cobrar', v: a.agro ? a.agro.pend : 0, src: 'agro' });
-  xs.push({ k: 'clientes', nombre: 'Asesoramiento', sub: 'App Clientes · meses vencidos sin cobrar', v: a.clientes ? a.clientes.pend : 0, src: 'clientes' });
+  xs.push({ k: 'clientes', nombre: 'Asesoramiento', sub: 'App Asesor · meses vencidos sin cobrar', v: a.clientes ? a.clientes.pend : 0, src: 'clientes' });
   return xs;
 }
 /* Las 8 cifras de partida de un mes. Todo lo demás se deriva de ellas. */
@@ -183,7 +183,7 @@ const FUENTES = {
   ventas: { nombre: 'Ventas', url: '../ventas/' },
   stock: { nombre: 'Stock Fincas', url: '../stock-fincas/' },
   agro: { nombre: 'AgroServicios', url: '../agroservicios/' },
-  clientes: { nombre: 'Clientes', url: '../Clientes/' },
+  clientes: { nombre: 'Asesor', url: '../asesor/' }, // antes la app Clientes; la clave 'clientes' se mantiene para no perder el dato ya guardado
 };
 const leido = {}; // fuente → true si se ha leído en esta sesión
 function readOtherIDB(name) {
@@ -260,12 +260,24 @@ function calcClientes(db, hoyYM = monthOf(todayISO())) {
   }
   return { pend: r2(pend) };
 }
+// Cobros de asesoría: ahora se anotan en Asesor (IndexedDB «asesor», mismos campos clientes y años que la app Clientes).
+// Si Asesor aún no está instalada o no tiene tablas de planes y cobros, se usa la app Clientes como respaldo.
+async function leerAsesoria() {
+  try {
+    const a = await readOtherIDB('asesor');
+    if (a && Array.isArray(a.clientes) && a.años && Object.keys(a.años).length) {
+      const r = calcClientes(a);
+      if (r) return r;
+    }
+  } catch (_) { /* se prueba el respaldo */ }
+  try { const raw = localStorage.getItem('clientes_v1'); return raw ? calcClientes(JSON.parse(raw)) : null; } catch (_) { return null; }
+}
 async function leerFuentes() {
   const res = {};
   try { res.ventas = calcVentas(await readOtherIDB('ventas-fgagro')); } catch (_) { res.ventas = null; }
   try { res.stock = calcStock(await readOtherIDB('stock-fincas')); } catch (_) { res.stock = null; }
   try { res.agro = calcAgro(await readOtherIDB('agroservicios')); } catch (_) { res.agro = null; }
-  try { const raw = localStorage.getItem('clientes_v1'); res.clientes = raw ? calcClientes(JSON.parse(raw)) : null; } catch (_) { res.clientes = null; }
+  try { res.clientes = await leerAsesoria(); } catch (_) { res.clientes = null; }
   let cambio = false;
   const nuevo = { ...(state.auto || {}) };
   for (const [k, v] of Object.entries(res)) {
@@ -1105,7 +1117,7 @@ function openSettings() {
   const fu = Object.keys(FUENTES).map((k) => { const e = estadoFuente(k); return `<div><span>${FUENTES[k].nombre}</span><b><span class="tag ${e.cls}">${e.txt}</span></b></div>`; }).join('');
   const body = openSheet('Ajustes', `
     <h3 style="margin-top:4px">Datos de tus otras apps</h3>
-    <p class="small">Stock y cobros pendientes se leen solos de Ventas, Stock Fincas, AgroServicios y Clientes instaladas en este móvil.</p>
+    <p class="small">Stock y cobros pendientes se leen solos de Ventas, Stock Fincas, AgroServicios y Asesor instaladas en este móvil.</p>
     <div class="box">${fu}</div>
     <button type="button" class="switch" id="stCom" role="switch" aria-checked="${!!state.settings.comisiones}"><span>Contar las comisiones pendientes de Ventas como cobros</span><i></i></button>
     <div class="actions"><button class="btn" id="stRead">Leer ahora</button></div>
