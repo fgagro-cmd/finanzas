@@ -4,7 +4,7 @@
    Todo se guarda en el propio móvil (IndexedDB) y funciona sin conexión.
    El código no contiene datos personales: se cargan desde un fichero (Ajustes → Cargar copia). */
 
-const APP_VERSION = '1.1.2';
+const APP_VERSION = '1.2.0';
 
 /* ---------- Utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -701,7 +701,7 @@ function renderDeudas() {
   let html = segBtns('dSeg', [['deudas', 'Deudas'], ['cobros', 'Cobros pendientes']], ui.dseg);
   if (ui.dseg === 'deudas') {
     html += `<div class="sec"><h3>Préstamos</h3><span>${eur(i.prestamos)}</span></div>
-      <ul class="list" id="prest">${[...state.prestamos].sort(byName).map((p) => `<li><button class="row" data-id="${p.id}"><div class="main"><div class="name">${esc(p.nombre)}</div><div class="sub">Capital pendiente${p.fecha ? ' a ' + fmtDate(p.fecha) : ''}</div></div><div class="side"><div class="big">${eur(p.capital)}</div></div></button></li>`).join('')}
+      <ul class="list" id="prest">${[...state.prestamos].sort(byName).map((p) => `<li><button class="row" data-id="${p.id}"><div class="main"><div class="name">${esc(p.nombre)}</div><div class="sub">${prestSub(p)}</div></div><div class="side"><div class="big">${eur(p.capital)}</div></div></button></li>`).join('')}
       <li><button class="row auto" data-id="" style="justify-content:center;color:var(--muted)">+ Añadir préstamo</button></li></ul>
       <div class="sec"><h3>Deudas pendientes</h3><span>${eur(i.deudas)}</span></div>
       ${listaItems('deudas')}`;
@@ -718,20 +718,38 @@ function renderDeudas() {
   const pr = $('#prest'); if (pr) pr.onclick = (e) => { const b = e.target.closest('[data-id]'); if (b) openPrestamo(b.dataset.id || null); };
   const au = $('#autoCob'); if (au) au.onclick = (e) => { const b = e.target.closest('[data-src]'); if (b) openFuente(b.dataset.src); };
 }
+/* Datos del préstamo para la previsión mensual: tipo de interés (TIN anual %), cuota mensual y fecha de fin. Opcionales. */
+const numOrNull = (v) => (v === '' || v == null || !isFinite(v) ? null : Number(v));
+function prestSub(p) {
+  const xs = [];
+  if (numOrNull(p.interes) != null) xs.push(String(round(p.interes, 2)).replace('.', ',') + ' %');
+  if (numOrNull(p.cuota) != null) xs.push(eur(p.cuota) + '/mes');
+  if (p.fin) xs.push('hasta ' + p.fin.slice(5, 7) + '/' + p.fin.slice(0, 4));
+  const base = 'Capital pendiente' + (p.fecha ? ' a ' + fmtDate(p.fecha) : '');
+  return xs.length ? base + ' · ' + xs.join(' · ') : base + ' · <span class="tag old">faltan interés, cuota y fin</span>';
+}
 function openPrestamo(id) {
   const isNew = !id;
-  const p = isNew ? { nombre: '', capital: '' } : state.prestamos.find((x) => x.id === id);
+  const p = isNew ? { nombre: '', capital: '', interes: '', cuota: '', fin: '' } : state.prestamos.find((x) => x.id === id);
+  if (!p) return;
   const body = openSheet(isNew ? 'Préstamo nuevo' : p.nombre, `
     ${field('pC', 'Capital pendiente hoy €', fmtIn(p.capital))}
     <label class="fld"><span>Nombre</span><input id="pN" type="text" value="${esc(p.nombre)}" autocomplete="off" placeholder="Ej.: Préstamo Caixa"></label>
-    <p class="hint">Lo actualizas tú cuando pagas cuotas o amortizas.</p>
+    <div class="grid2">${field('pI', 'Tipo de interés (TIN anual) %', fmtIn(p.interes), { ph: 'Ej.: 3,5' })}${field('pQ', 'Cuota mensual €', fmtIn(p.cuota))}</div>
+    <label class="fld"><span>Fecha de la última cuota</span><input id="pF" type="date" value="${esc(p.fin || '')}"></label>
+    <p class="hint">El capital lo actualizas tú cuando pagas cuotas o amortizas. Interés, cuota y fecha de fin los usa la previsión mensual del día 2 para decirte si conviene amortizar.</p>
     <div class="actions"><button class="btn primary" id="pSave">Guardar</button></div>
     ${isNew ? '' : '<div class="sep"></div><div class="actions"><button class="btn danger" id="pDel">Borrar préstamo</button></div>'}`);
   const save = () => {
     const nombre = $('#pN', body).value.trim(), cap = parseNum($('#pC', body).value);
+    const tInt = $('#pI', body).value.trim(), tCuo = $('#pQ', body).value.trim(), fin = $('#pF', body).value || '';
+    const interes = tInt ? parseNum(tInt) : '', cuota = tCuo ? parseNum(tCuo) : '';
     if (!nombre) return toast('Pon un nombre', true);
     if (!(cap >= 0)) return toast('Escribe el capital pendiente', true);
-    if (commit((s) => { if (isNew) s.prestamos.push({ id: uid(), nombre, capital: r2(cap), fecha: todayISO() }); else Object.assign(s.prestamos.find((z) => z.id === id), { nombre, capital: r2(cap), fecha: todayISO() }); })) { closeSheet(); toast('Préstamo guardado'); }
+    if (interes !== '' && !(interes >= 0 && interes < 50)) return toast('El interés va en %, por ejemplo 3,5', true);
+    if (cuota !== '' && !(cuota >= 0)) return toast('Escribe la cuota mensual en €', true);
+    const datos = { nombre, capital: r2(cap), fecha: todayISO(), interes: interes === '' ? '' : round(interes, 3), cuota: cuota === '' ? '' : r2(cuota), fin };
+    if (commit((s) => { if (isNew) s.prestamos.push({ id: uid(), ...datos }); else Object.assign(s.prestamos.find((z) => z.id === id), datos); })) { closeSheet(); toast('Préstamo guardado'); }
   };
   $('#pSave', body).onclick = save;
   const del = $('#pDel', body);
@@ -970,7 +988,7 @@ function syncPayload() {
   });
   const ctas = [...state.cuentas].sort(byName).map((c) => [c.nombre, GRUPOS[c.grupo], TIPOS[c.tipo], c.saldo, c.fecha || '']);
   const bienes = [...state.bienes].sort(byName).map((b) => [b.nombre, b.maquinaria ? 'Maquinaria' : 'Otros activos', b.valor, b.fecha || '']);
-  const prest = [...state.prestamos].sort(byName).map((p) => [p.nombre, p.capital, p.fecha || '']);
+  const prest = [...state.prestamos].sort(byName).map((p) => [p.nombre, p.capital, numOrNull(p.interes) ?? '', numOrNull(p.cuota) ?? '', p.fin || '', p.fecha || '']);
   const items = (xs) => [...xs].sort((x, y) => x.fecha.localeCompare(y.fecha)).map((x) => [x.fecha, x.quien, x.concepto || '', x.importe, pagado(x), pendiente(x), abierta(x) ? 'Pendiente' : 'Saldada', x.nota || '']);
   const cobAuto = autoCobros().map((x) => [todayISO(), x.nombre + ' (automático)', x.sub, x.v, 0, x.v, 'Pendiente', '']);
   const gastos = [];
@@ -980,7 +998,7 @@ function syncPayload() {
     { nombre: 'Histórico', cabecera: ['Mes (cierre)', 'Total bancos', 'Total efectivo', 'Total stock', 'Valor maquinaria', 'Otros activos', 'Total activos', 'Variación absoluta', 'Variación activos %', 'Préstamos', 'Deudas pendientes', 'Cobros pendientes', 'Total deuda', 'Variación deuda', 'Capital neto', 'Variación capital neto', '% Variación C. Neto', 'Liquidez total', 'Ratio liquidez/deuda', 'Endeudamiento', 'Índice indep. financiera', '% Stock', 'Balance situación', 'Comentario', 'Objetivo', 'Cierre'], filas: hist, formatos: ['dd/mm/yyyy', EUR, EUR, EUR, EUR, EUR, EUR, EUR, PC, EUR, EUR, EUR, EUR, EUR, EUR, EUR, PC, EUR, R, R, R, PC, EUR, null, null, null], fechas: [0] },
     { nombre: 'Cuentas', cabecera: ['Cuenta', 'Grupo', 'Tipo', 'Saldo (€)', 'Actualizado'], filas: ctas, formatos: [null, null, null, EUR, 'dd/mm/yyyy'], fechas: [4] },
     { nombre: 'Bienes', cabecera: ['Bien', 'Cuenta como', 'Valor (€)', 'Actualizado'], filas: bienes, formatos: [null, null, EUR, 'dd/mm/yyyy'], fechas: [3] },
-    { nombre: 'Préstamos', cabecera: ['Préstamo', 'Capital pendiente (€)', 'Actualizado'], filas: prest, formatos: [null, EUR, 'dd/mm/yyyy'], fechas: [2] },
+    { nombre: 'Préstamos', cabecera: ['Préstamo', 'Capital pendiente (€)', 'Interés TIN (%)', 'Cuota mensual (€)', 'Fecha fin', 'Actualizado'], filas: prest, formatos: [null, EUR, '0.00', EUR, 'dd/mm/yyyy', 'dd/mm/yyyy'], fechas: [4, 5] },
     { nombre: 'Deudas', cabecera: ['Fecha', 'A quién', 'Concepto', 'Importe (€)', 'Pagado (€)', 'Pendiente (€)', 'Estado', 'Nota'], filas: items(state.deudas), formatos: ['dd/mm/yyyy', null, null, EUR, EUR, EUR, null, null], fechas: [0] },
     { nombre: 'Cobros', cabecera: ['Fecha', 'Quién', 'Concepto', 'Importe (€)', 'Cobrado (€)', 'Pendiente (€)', 'Estado', 'Nota'], filas: cobAuto.concat(items(state.cobros)), formatos: ['dd/mm/yyyy', null, null, EUR, EUR, EUR, null, null], fechas: [0] },
     { nombre: 'Gastos', cabecera: ['Fecha', 'Concepto', 'Categoría', 'Importe (€)'], filas: gastos, formatos: ['dd/mm/yyyy', null, null, EUR], fechas: [0] },
