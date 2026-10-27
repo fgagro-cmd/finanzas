@@ -1,0 +1,8 @@
+{
+  "name": "prevision-finanzas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Previsión financiera mensual (día 2): cruza Finanzas, fincas y el resto del negocio. No forma parte de la app.",
+  "main": "prevision.js",
+  "dependencies": { "xlsx": "0.18.5" }
+}
