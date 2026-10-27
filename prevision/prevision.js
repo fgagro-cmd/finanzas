@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Previsión financiera mensual · FG Agro (versión 1.1, 27/10/2026)
+ * Previsión financiera mensual · FG Agro (versión 1.2, 27/10/2026)
  *
  * Cruza Finanzas con las cuentas de las fincas y el resto del negocio y saca la previsión de
  * caja a 12 meses, el colchón de 3 meses y los datos para las recomendaciones.
@@ -23,7 +23,9 @@
  *      · cosecha + subvenciones = presupuesto de la campaña (o lo real de la anterior si no hay) menos lo
  *        ya cobrado, repartido con el calendario medio de cobro de las dos últimas campañas cerradas;
  *      · arrendamiento = regla de «Parámetros» (la de Cuentas fincas) sobre el presupuesto, menos lo pagado,
- *        al mismo ritmo que la cosecha; recolección contratada = presupuesto menos lo pagado, igual.
+ *        al mismo ritmo que la cosecha: Francis lo paga después de cobrar, nunca antes (se deja en el mismo mes, prudente);
+ *      · recolección contratada = presupuesto menos lo pagado: se la DESCUENTAN del cobro de la cosecha, así que no es
+ *        una salida aparte: la entrada «fincas» es la cosecha neta de recolección (el 131 se calcula sobre la bruta).
  *  - Resto del negocio (como la Vista única): asesoría = cuotas activas de cada mes; productos = margen
  *    (venta − coste) del mismo mes del año pasado; comisiones = las del mismo mes del año pasado × lo que
  *    se suele cobrar; AgroServicios (sin amortización) = media mensual de este año.
@@ -324,7 +326,7 @@ function pagoFraccionado(m) { // enero, abril, julio, octubre: 2 % del trimestre
 let saldo = liquidez;
 const filas = meses.map((m, i) => {
   const e = {
-    fincas: flujoCosecha[m] || 0,
+    fincas: (flujoCosecha[m] || 0) - (flujoRec[m] || 0), // cosecha neta: la recolección viene descontada en la liquidación
     asesoria: cuotasMes(m),
     productos: margenMes[addM(m, -12)] || 0,
     comisiones: (comMes[addM(m, -12)] || 0) * comRatio,
@@ -335,7 +337,6 @@ const filas = meses.map((m, i) => {
     personal: PERSONAL_MES,
     fincasCorrientes: pagosCorrientes(m),
     arrendamientos: flujoArr[m] || 0,
-    recoleccion: flujoRec[m] || 0,
     prestamos: cuotaMes(m),
     deudasPendientes: i < MESES_PENDIENTES ? deudaPend / MESES_PENDIENTES : 0,
     impuestosFincas: pagoFraccionado(m),
@@ -345,6 +346,7 @@ const filas = meses.map((m, i) => {
   const o = { mes: m, etiqueta: etiqueta(m), entradas: {}, salidas: {}, totalEntradas: r0(ent), totalSalidas: r0(sal), neto: r0(ent - sal), saldoFinal: r0(saldo) };
   Object.entries(e).forEach(([k, v]) => { o.entradas[k] = r0(v); });
   Object.entries(s).forEach(([k, v]) => { o.salidas[k] = r0(v); });
+  o.cosecha = { bruta: r0(flujoCosecha[m] || 0), recoleccionDescontada: r0(flujoRec[m] || 0) };
   return o;
 });
 const recurrenteMedio = sum(filas, (f) => f.salidas.personal + f.salidas.fincasCorrientes + f.salidas.prestamos) / filas.length;
@@ -399,7 +401,8 @@ const salida = {
   supuestos: [
     `Personal: ${PERSONAL_MES} €/mes fijos.`,
     'Fincas: pagos corrientes = los del mismo mes de hace un año; cosecha, arrendamiento y recolección contratada = presupuesto de la campaña menos lo ya anotado, con el calendario de cobro de las dos últimas campañas cerradas.',
-    'Arrendamientos con la regla de «Parámetros» (la misma de Cuentas fincas) sobre el presupuesto.',
+    'Recolección: te la descuentan del cobro de la cosecha, así que la entrada de fincas va neta de recolección (no es un pago que adelantes).',
+    'Arrendamientos con la regla de «Parámetros» (la misma de Cuentas fincas) sobre el presupuesto; se pagan después de cobrar la cosecha, nunca antes (en la previsión, el mismo mes del cobro).',
     'Asesoría: cuotas activas cada mes. Productos: margen del mismo mes del año pasado. Comisiones: las del año pasado × la parte que se suele cobrar. AgroServicios: media mensual de este año.',
     `Deudas pendientes y cobros automáticos de asesoría y clientes de Ventas: repartidos en ${MESES_PENDIENTES} meses. Comisiones pendientes y cobros a mano: fuera de la previsión.`,
     'Pago fraccionado (131) de las fincas: 2 % de los ingresos agrarios del trimestre, sin restar retenciones (prudente).',
