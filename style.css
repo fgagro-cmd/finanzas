@@ -139,6 +139,7 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
 .fld { display: block; margin: 0 0 14px; border: 0; padding: 0; }
+.fld[hidden] { display: none; }
 .fld > span { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .grid3 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }

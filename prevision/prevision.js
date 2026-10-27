@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Previsión financiera mensual · FG Agro (versión 1.0, 27/10/2026)
+ * Previsión financiera mensual · FG Agro (versión 1.1, 27/10/2026)
  *
  * Cruza Finanzas con las cuentas de las fincas y el resto del negocio y saca la previsión de
  * caja a 12 meses, el colchón de 3 meses y los datos para las recomendaciones.
@@ -29,6 +29,8 @@
  *    se suele cobrar; AgroServicios (sin amortización) = media mensual de este año.
  *  - Pendientes: cobros automáticos de asesoría y clientes de Ventas y todas las deudas, en 3 meses;
  *    comisiones pendientes y cobros a mano NO entran (son «liquidez que puedes activar»).
+ *  - Préstamos: cuota de Finanzas. Mensual = cada mes; anual = la cuota entera en el mes del «Próximo cobro», cada año
+ *    (si esa fecha ya ha pasado en el mes de partida y es anterior a la foto de Finanzas, se da por pagada). Hasta la fecha fin.
  *  - Impuestos (solo fincas, módulos): pago fraccionado 131 = 2 % de los ingresos agrarios del trimestre
  *    (prudente: sin restar retenciones); se paga en abril, julio, octubre y enero.
  */
@@ -274,16 +276,29 @@ const capTotal = sum(prestamos, (p) => num(p['Capital pendiente (€)']));
 const loans = prestamos.map((p) => {
   const cap = num(p['Capital pendiente (€)']);
   const tin = String(p['Interés TIN (%)'] ?? '').trim() === '' ? null : num(p['Interés TIN (%)']);
-  const cuota = String(p['Cuota mensual (€)'] ?? '').trim() === '' ? null : num(p['Cuota mensual (€)']);
+  const cuotaTxt = p['Cuota (€)'] ?? p['Cuota mensual (€)'] ?? ''; // «Cuota mensual (€)» hasta Finanzas 1.2.0
+  const cuota = String(cuotaTxt).trim() === '' ? null : num(cuotaTxt);
   const fin = fecha(p['Fecha fin']) || '';
+  const anual = /^anual/i.test(String(p['Periodicidad'] ?? '').trim());
+  const prox = anual ? (fecha(p['Próximo cobro']) || '') : '';
+  if (anual && !prox) avisos.push(`El préstamo «${p['Préstamo']}» es anual pero no tiene fecha de próximo cobro: lo reparto como si fuera mensual (cuota / 12).`);
   const est = cuota == null;
-  const cuotaUsada = cuota != null ? cuota : (capTotal ? caidaMedia * cap / capTotal : 0);
+  const cuotaUsada = cuota != null ? cuota : (capTotal ? caidaMedia * cap / capTotal * (anual ? 12 : 1) : 0);
   let interesMes = tin != null ? cap * (tin / 100) / 12 : null;
   const mesesRest = fin ? Math.max(0, diffM(mes0, ym(fin)) + 1) : null;
-  return { nombre: p['Préstamo'], capital: r2(cap), tin, ahorroAnualPor1000: tin != null ? r2(10 * tin) : null, cuota, cuotaUsada: r2(cuotaUsada), cuotaEstimada: est, fin, mesesRestantes: mesesRest, interesAnual: tin != null ? r0(cap * tin / 100) : null, interesMes: interesMes != null ? r2(interesMes) : null };
+  return { nombre: p['Préstamo'], periodicidad: anual ? 'anual' : 'mensual', proximoCobro: prox, capital: r2(cap), tin, ahorroAnualPor1000: tin != null ? r2(10 * tin) : null, cuota, cuotaUsada: r2(cuotaUsada), cuotaEstimada: est, fin, mesesRestantes: mesesRest, interesAnual: tin != null ? r0(cap * tin / 100) : null, interesMes: interesMes != null ? r2(interesMes) : null };
 });
 if (loans.some((l) => l.cuotaEstimada || l.tin == null || !l.fin)) avisos.push('Faltan datos de algún préstamo (interés, cuota o fecha de fin) en Finanzas → Deudas y cobros → Préstamos. Hasta que estén, la cuota se estima con lo que baja el capital cada mes y no se puede valorar si conviene amortizar.');
-const cuotaMes = (m) => sum(loans, (l) => (l.fin && m > ym(l.fin)) ? 0 : l.cuotaUsada);
+function cuotaPrestamo(l, m) {
+  if (l.fin && m > ym(l.fin)) return 0;
+  if (l.periodicidad !== 'anual') return l.cuotaUsada;
+  if (!l.proximoCobro) return l.cuotaUsada / 12;
+  if (m.slice(5) !== l.proximoCobro.slice(5, 7)) return 0;
+  const dia = `${m}-${l.proximoCobro.slice(8, 10)}`; // fecha de cobro de ese año
+  if (m === mes0 && fechaFoto && dia <= fechaFoto) return 0; // ya pagado: está en la liquidez de partida
+  return l.cuotaUsada;
+}
+const cuotaMes = (m) => sum(loans, (l) => cuotaPrestamo(l, m));
 
 /* ---------- pendientes ---------- */
 const pendDe = (r) => num(r['Pendiente (€)']);
