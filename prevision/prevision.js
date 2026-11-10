@@ -398,6 +398,11 @@ const salida = {
     pagosFraccionados: filas.filter((f) => f.salidas.impuestosFincas > 0).map((f) => ({ mes: f.etiqueta, importe: f.salidas.impuestosFincas })),
     ingresosAgrariosAnioEnCurso: r0(sum(Object.entries(ingFincasReal).filter(([m]) => m.startsWith(anio)), ([, v]) => v)),
   },
+  // Para la pestaña «Previsión» de la hoja de Finanzas (la lee la Vista única): una fila por mes
+  hoja: {
+    cabecera: ['Mes', 'Etiqueta', 'Entradas (€)', 'Salidas (€)', 'Neto (€)', 'Saldo a fin de mes (€)', 'Colchón (€)', 'Holgura (€)', 'Bajo colchón', 'Negativo', 'Generado'],
+    filas: filas.map((f, i) => [f.mes, f.etiqueta, f.totalEntradas, f.totalSalidas, f.neto, f.saldoFinal, colchon, r0(f.holgura), f.bajoColchon ? 'Sí' : 'No', f.negativo ? 'Sí' : 'No', i === 0 ? hoy : '']),
+  },
   supuestos: [
     `Personal: ${PERSONAL_MES} €/mes fijos.`,
     'Fincas: pagos corrientes = los del mismo mes de hace un año; cosecha, arrendamiento y recolección contratada = presupuesto de la campaña menos lo ya anotado, con el calendario de cobro de las dos últimas campañas cerradas.',

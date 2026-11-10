@@ -12,7 +12,8 @@ Cruza Finanzas con las cuentas de las fincas y el resto del negocio y calcula:
 - el colchón de 3 meses de salidas (personal + pagos de fincas + cuotas) y los meses en que la caja baja de él;
 - lo que se podría usar hoy sin bajar del colchón en ningún mes;
 - los datos de los préstamos para valorar si conviene amortizar;
-- los pagos fraccionados (131) de las fincas.
+- los pagos fraccionados (131) de las fincas;
+- `hoja`: las filas mes a mes que la tarea escribe en la pestaña «Previsión» de la hoja de Finanzas (la lee la Vista única).
 
 ## Datos que necesita (carpeta de datos)
 
