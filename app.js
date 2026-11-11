@@ -4,7 +4,7 @@
    Todo se guarda en el propio móvil (IndexedDB) y funciona sin conexión.
    El código no contiene datos personales: se cargan desde un fichero (Ajustes → Cargar copia). */
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 
 /* ---------- Utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -1174,6 +1174,38 @@ const TABS = {
   deudas: { title: 'Deudas y cobros', fab: () => (ui.dseg === 'deudas' ? 'Nueva deuda' : 'Nuevo cobro'), head: headDeudas, render: renderDeudas },
   presu: { title: 'Presupuesto', fab: () => (ui.pseg === 'ajustes' ? null : 'Nuevo gasto'), head: headPresu, render: renderPresu },
 };
+/* ---------- Aviso de copia de seguridad (desde 1.3.1) ----------
+   Si la última copia en fichero tiene 15 días o más (o no hay ninguna), sale un aviso arriba con «Guardar copia».
+   «Mañana» lo aparca hasta el día siguiente en este aparato. Va fuera de #view para que no se borre al repintar una pestaña. */
+const COPIA_DIAS = 15, COPIA_POSPONER = 'finanzas-avisoCopia';
+function diasDesdeCopia() {
+  const f = state.settings.lastBackup;
+  if (!f) return null;
+  const t = new Date(f).getTime();
+  return isNaN(t) ? null : Math.max(0, Math.floor((Date.now() - t) / 864e5));
+}
+function pintarAvisoCopia() {
+  const box = document.getElementById('avisoCopiaBox');
+  if (!box) return;
+  let ver = false, d = null;
+  try {
+    if (state && !(isEmpty())) {
+      d = diasDesdeCopia();
+      let hasta = 0; try { hasta = Number(localStorage.getItem(COPIA_POSPONER)) || 0; } catch (_) {}
+      ver = (d === null || d >= COPIA_DIAS) && Date.now() >= hasta;
+    }
+  } catch (_) { ver = false; }
+  if (!ver) { box.innerHTML = ''; return; }
+  const txt = d === null ? 'Aún no has guardado ninguna copia de seguridad en fichero.' : `Tu última copia de seguridad es de hace ${d} días.`;
+  box.innerHTML = `<div class="aviso-copia" role="status"><div class="aviso-copia-txt"><b>🛟 ${txt}</b><span>Guárdala en Drive › Apps › Copia de seguridad.</span></div><div class="aviso-copia-btns"><button class="btn primary" id="acGuardar">Guardar copia</button><button class="btn" id="acLuego">Mañana</button></div></div>`;
+  document.getElementById('acGuardar').onclick = async () => { await shareOrDownloadBackup(); pintarAvisoCopia(); };
+  document.getElementById('acLuego').onclick = () => {
+    const m = new Date(); m.setHours(24, 0, 0, 0);
+    try { localStorage.setItem(COPIA_POSPONER, String(m.getTime())); } catch (_) {}
+    pintarAvisoCopia();
+  };
+}
+
 function renderAll() {
   const t = TABS[ui.tab];
   $('#topTitle').textContent = t.title;
@@ -1184,6 +1216,7 @@ function renderAll() {
   $('#fab').hidden = !fab; if (fab) $('#fabLabel').textContent = fab;
   renderSyncStatus();
   t.render();
+  pintarAvisoCopia();
 }
 
 async function init() {
