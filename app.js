@@ -4,7 +4,7 @@
    Todo se guarda en el propio móvil (IndexedDB) y funciona sin conexión.
    El código no contiene datos personales: se cargan desde un fichero (Ajustes → Cargar copia). */
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.2';
 
 /* ---------- Utilidades ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -121,7 +121,7 @@ function autoCobros(st = state) {
   ];
   if (st.settings.comisiones) xs.push({ k: 'comisiones', nombre: 'Comisiones pendientes', sub: 'De la app de Ventas', v: a.ventas ? a.ventas.com : 0, src: 'ventas' });
   xs.push({ k: 'agro', nombre: 'Trabajos externos', sub: 'AgroServicios · sin cobrar', v: a.agro ? a.agro.pend : 0, src: 'agro' });
-  xs.push({ k: 'clientes', nombre: 'Asesoramiento', sub: 'App Asesor · meses vencidos sin cobrar', v: a.clientes ? a.clientes.pend : 0, src: 'clientes' });
+  xs.push({ k: 'clientes', nombre: 'Asesoramiento', sub: 'App Asesor · cuotas vencidas y trabajos puntuales sin cobrar', v: a.clientes ? a.clientes.pend : 0, src: 'clientes' });
   return xs;
 }
 /* Las 8 cifras de partida de un mes. Todo lo demás se deriva de ellas. */
@@ -257,6 +257,11 @@ function calcClientes(db, hoyYM = monthOf(todayISO())) {
         pend += Number((r.imp || [])[i]) || 0;
       }
     }
+  }
+  // Trabajos puntuales de Asesor (desde Asesor 1.5.0): sin cobrar desde el mes del trabajo
+  for (const p of Array.isArray(db.puntuales) ? db.puntuales : []) {
+    if (!p || p.cobrado || String(p.fecha || '').slice(0, 7) > hoyYM) continue;
+    pend += Number(p.importe) || 0;
   }
   return { pend: r2(pend) };
 }
